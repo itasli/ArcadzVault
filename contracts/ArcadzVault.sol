@@ -24,7 +24,6 @@ contract ArcadzVault is Ownable, Pausable, ReentrancyGuard {
     error InvalidSignature();
     error InvalidNonce();
     error InsufficientContractBalance();
-    error InvalidSignatureLength();
 
     // Events
     event BonezDeposit(address indexed user, uint amount);
