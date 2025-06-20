@@ -6,7 +6,12 @@
     "test": "npx hardhat test",
     "test:coverage": "SOLIDITY_COVERAGE=true npx hardhat coverage",
     "build": "hardhat compile && npm run codegen",
-    "codegen": "wagmi generate"
+    "codegen": "wagmi generate",
+
+    "node" : "npx hardhat node",
+    "deploy:localhost": "npx hardhat ignition deploy ./ignition/modules/ArcadzVault.ts --network localhost",
+    "deplot:testnet": "npx hardhat ignition deploy ./ignition/modules/ArcadzVault.ts --network fuji",
+    "deploy:mainnet": "npx hardhat ignition deploy ./ignition/modules/ArcadzVault.ts --network mainnet"
   },
   "repository": {
     "type": "git",

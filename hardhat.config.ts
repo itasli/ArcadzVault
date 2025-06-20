@@ -25,10 +25,7 @@ const config: HardhatUserConfig = {
       url: "https://api.avax.network/ext/bc/C/rpc",
       chainId: 43114,
       accounts: [process.env.PRIVATE_KEY!],
-    },
-    hardhat: {
-      chainId: 1337,
-    },
+    }
   }
 };
 
