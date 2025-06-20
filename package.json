@@ -3,15 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "test": "npx hardhat test",
+    "test": "hardhat test",
     "test:coverage": "SOLIDITY_COVERAGE=true npx hardhat coverage",
     "build": "hardhat compile && npm run codegen",
     "codegen": "wagmi generate",
 
-    "node" : "npx hardhat node",
-    "deploy:localhost": "npx hardhat ignition deploy ./ignition/modules/ArcadzVault.ts --network localhost",
-    "deplot:testnet": "npx hardhat ignition deploy ./ignition/modules/ArcadzVault.ts --network fuji",
-    "deploy:mainnet": "npx hardhat ignition deploy ./ignition/modules/ArcadzVault.ts --network mainnet"
+    "node" : "hardhat node",
+    "deploy:localhost": "hardhat ignition deploy ./ignition/modules/ArcadzVault.ts --network localhost",
+    "deploy:testnet": "hardhat ignition deploy ./ignition/modules/ArcadzVault.ts --network fuji",
+    "deploy:mainnet": "hardhat ignition deploy ./ignition/modules/ArcadzVault.ts --network mainnet",
+
+    "generate-signature": "hardhat generate-signature"
   },
   "repository": {
     "type": "git",
