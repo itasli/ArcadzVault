@@ -16,7 +16,7 @@ contract ArcadzVault is Ownable, Pausable, ReentrancyGuard {
     address public bonezContract;
     address private signer;
 
-    mapping(address => uint) public nonceByAddress;
+    mapping(address => uint256) public nonceByAddress;
 
     // Custom errors
     error ZeroAmount();
@@ -26,8 +26,8 @@ contract ArcadzVault is Ownable, Pausable, ReentrancyGuard {
     error InsufficientContractBalance();
 
     // Events
-    event BonezDeposit(address indexed user, uint amount);
-    event BonezWithdraw(address indexed user, uint amount, uint nonce);
+    event BonezDeposit(address indexed user, uint256 amount);
+    event BonezWithdraw(address indexed user, uint256 amount, uint256 nonce);
 
     constructor(
         address _bonez,
@@ -41,7 +41,7 @@ contract ArcadzVault is Ownable, Pausable, ReentrancyGuard {
     /*           Deposit Function         */
     /* ********************************** */
 
-    function deposit(uint amount) external whenNotPaused nonReentrant {
+    function deposit(uint256 amount) external whenNotPaused nonReentrant {
         if (amount == 0) revert ZeroAmount();
         if (bonezContract == address(0)) revert BonezContractNotSet();
         
@@ -55,8 +55,8 @@ contract ArcadzVault is Ownable, Pausable, ReentrancyGuard {
     /* ********************************** */
 
     function withdraw(
-        uint amount,
-        uint nonce,
+        uint256 amount,
+        uint256 nonce,
         bytes memory signature
     ) external whenNotPaused nonReentrant {
         if (amount == 0) revert ZeroAmount();
@@ -75,8 +75,8 @@ contract ArcadzVault is Ownable, Pausable, ReentrancyGuard {
     /* ********************************** */
 
     function verify(
-        uint amount,
-        uint nonce,
+        uint256 amount,
+        uint256 nonce,
         address userAddress,
         bytes memory signature
     ) public view returns (bool) {
