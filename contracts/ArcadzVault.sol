@@ -41,7 +41,7 @@ contract ArcadzVault is Ownable, Pausable, ReentrancyGuard {
     /*           Deposit Function         */
     /* ********************************** */
 
-    function deposit(uint256 amount) external whenNotPaused nonReentrant {
+    function deposit(uint256 amount) external whenNotPaused {
         if (amount == 0) revert ZeroAmount();
         if (bonezContract == address(0)) revert BonezContractNotSet();
         
@@ -60,9 +60,9 @@ contract ArcadzVault is Ownable, Pausable, ReentrancyGuard {
         bytes memory signature
     ) external whenNotPaused nonReentrant {
         if (amount == 0) revert ZeroAmount();
-        if (!verify(amount, nonce, msg.sender, signature)) revert InvalidSignature();
         if (nonceByAddress[msg.sender] != nonce) revert InvalidNonce();
         if (IERC20(bonezContract).balanceOf(address(this)) < amount) revert InsufficientContractBalance();
+        if (!verify(amount, nonce, msg.sender, signature)) revert InvalidSignature();
 
         nonceByAddress[msg.sender]++;
         IERC20(bonezContract).safeTransfer(msg.sender, amount);
