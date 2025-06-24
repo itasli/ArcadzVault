@@ -27,6 +27,11 @@ const config: HardhatUserConfig = {
       chainId: 43114,
       accounts: [process.env.PRIVATE_KEY!],
     }
+  },
+  gasReporter: {
+    enabled: true,
+    excludeContracts : ["/test"],
+    L1: "avalanche",
   }
 };
 
