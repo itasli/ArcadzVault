@@ -1,19 +1,22 @@
 import type { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox-viem";
-import "./tasks/generateSignature";
+import 'solidity-coverage'
 import * as dotenv from "dotenv";
+
+import "./tasks/generateSignature";
+
 
 dotenv.config();
 
 const config: HardhatUserConfig = {
   solidity: {
-    version : "0.8.28",
+    version : "0.8.30",
     settings: {
         optimizer: {
           enabled: true,
           runs: 200,
         },
-        viaIR: true,
+        viaIR: false,
       },
   },
   networks: {
