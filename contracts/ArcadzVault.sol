@@ -25,7 +25,6 @@ contract ArcadzVault is Ownable, Pausable, ReentrancyGuard, EIP712 {
 
     // Custom errors
     error ZeroAmount();
-    error BonezContractNotSet();
     error InvalidSignature();
     error InvalidNonce();
     error InsufficientContractBalance();
@@ -60,7 +59,6 @@ contract ArcadzVault is Ownable, Pausable, ReentrancyGuard, EIP712 {
 
     function deposit(uint256 amount) external whenNotPaused {
         if (amount == 0) revert ZeroAmount();
-        if (bonezContract == address(0)) revert BonezContractNotSet();
         
         IERC20(bonezContract).safeTransferFrom(msg.sender, address(this), amount);
         
