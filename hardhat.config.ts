@@ -35,6 +35,9 @@ const config: HardhatUserConfig = {
     enabled: true,
     excludeContracts : ["/test"],
     L1: "avalanche",
+    currency: "USD",
+    coinmarketcap: process.env.COINMARKETCAP_API_KEY,
+    etherscan: process.env.ETHERSCAN_API_KEY,
   },
   sourcify: {
     enabled: true
