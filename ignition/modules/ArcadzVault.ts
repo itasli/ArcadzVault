@@ -1,9 +1,13 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
+import { parseEther } from "viem";
+import * as dotenv from "dotenv";
+
+dotenv.config();
 
 const ArcadzVaultModule = buildModule("ArcadzVaultModule", (m) => {
-  const signer = m.getParameter("signer", "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
+  const signer = m.getParameter("signer", process.env.SIGNER_ADDRESS);
 
-  const bonezToken = m.contract("MockERC20", ["Bonez Token", "BONEZ", 100000000]);
+  const bonezToken = m.contract("MockERC20", ["Bonez Token", "BONEZ", parseEther("1000000")]);
 
   const vault = m.contract("ArcadzVault", [bonezToken, signer]);
 

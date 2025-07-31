@@ -56,7 +56,7 @@ To generate a withdraw signature (for testing or frontend usage):
 npx hardhat generate-signature --vault <vaultAddress> --amount <amount> --nonce <nonce> --user <userAddress>
 ```
 
-Requires a `PRIVATE_KEY` in `.env` file (used as the authorized signer).
+Requires a `PRIVATE_KEY` and `SIGNER_ADDRESS` in `.env` file (used as the authorized signer).
 
 ## Project Structure
 
