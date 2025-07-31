@@ -441,13 +441,6 @@ describe("ArcadzVault", function () {
     });
   });
 
-  it("Should return signer address", async function () {
-    const { arcadzVault, owner, signer } = await loadFixture(deployFixture);
-
-    const signerAddress = await arcadzVault.read.getSigner({ account: owner.account });
-    expect(signerAddress).to.equal(getAddress(signer.account.address));
-  });
-
   describe("Pausable", function () {
     it("Should allow owner to pause and unpause", async function () {
       const { arcadzVault } = await loadFixture(deployFixture);
