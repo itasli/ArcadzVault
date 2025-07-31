@@ -32,6 +32,15 @@ npm run deploy:testnet     # Deploy to Avalanche Fuji testnet
 npm run deploy:mainnet     # Deploy to Avalanche Mainnet
 ```
 
+## Verification
+
+To verify the contract, ensure you have the `ETHERSCAN_API_KEY` set in your `.env` file. Then run:
+
+```sh
+npx hardhat verify --network <network> <contractAddress> "<bonezAddress>" "<signerAddress>"
+```
+
+
 ## Commands
 
 All commands are run from the project root:
