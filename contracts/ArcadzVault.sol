@@ -14,7 +14,7 @@ contract ArcadzVault is Ownable, Pausable, ReentrancyGuard, EIP712 {
     using ECDSA for bytes32;
 
     address public bonezContract;
-    address private signer;
+    address public signer;
 
     mapping(address => uint256) public nonceByAddress;
 
@@ -166,10 +166,6 @@ contract ArcadzVault is Ownable, Pausable, ReentrancyGuard, EIP712 {
         require(success, "Transfer failed");
         
         emit AvaxWithdraw(msg.sender, balance);
-    }
-
-    function getSigner() external onlyOwner view returns (address) {
-        return signer;
     }
 
     receive() external payable {}
