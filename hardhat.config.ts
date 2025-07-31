@@ -35,7 +35,23 @@ const config: HardhatUserConfig = {
     enabled: true,
     excludeContracts : ["/test"],
     L1: "avalanche",
-  }
+  },
+  sourcify: {
+    enabled: true
+  },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_API_KEY,
+    customChains: [
+      {
+        network: "fuji",
+        chainId: 43113,
+        urls: {
+          apiURL: "https://api.routescan.io/v2/network/testnet/evm/43113/etherscan",
+          browserURL: "https://testnet.snowtrace.io"
+        }
+      }
+    ]
+  },
 };
 
 export default config;
