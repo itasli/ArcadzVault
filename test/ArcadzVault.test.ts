@@ -10,6 +10,10 @@ describe("ArcadzVault", function () {
 
     const publicClient = await hre.viem.getPublicClient();
 
+    const chainId = hre.network.config.chainId!;
+
+    const deadline = BigInt(Date.now()) + 60n * 1000n; // now + 1 minute
+
     // Deploy mock ERC20 token
     const mockToken = await hre.viem.deployContract("MockERC20", [
       "Bonez Token",
@@ -30,12 +34,14 @@ describe("ArcadzVault", function () {
     return {
       arcadzVault,
       mockToken,
+      chainId,
       owner,
       signer,
       user1,
       user2,
       publicClient,
       otherAccounts,
+      deadline
     };
   }
 
@@ -53,14 +59,14 @@ describe("ArcadzVault", function () {
     });
 
     it("Should set the right signer", async function () {
-      const { arcadzVault, signer, user1 } = await loadFixture(deployFixture);
-      
+      const { arcadzVault, signer, user1, deadline, chainId } = await loadFixture(deployFixture);
+
       const amount = parseEther("50");
       const nonce = 0n;
-      const messageHash = await getMessageHash(arcadzVault.address, amount, nonce, user1.account.address);
-      const signature = await signer.signMessage({ message: { raw: messageHash } });
+
+      const signature = await createWithdrawSignature(signer, arcadzVault.address, amount, nonce, deadline, user1.account.address, chainId);
       
-      expect(await arcadzVault.read.verify([amount, nonce, user1.account.address, signature])).to.be.true;
+      expect(await arcadzVault.read.verify([amount, nonce, deadline, user1.account.address, signature])).to.be.true;
     });
   });
 
@@ -98,14 +104,12 @@ describe("ArcadzVault", function () {
       ).to.be.rejectedWith("ZeroAmount");
     });
 
-    it("Should revert when bonez contract is not set", async function () {
-      const { arcadzVault, user1 } = await loadFixture(deployFixture);
-      
-      await arcadzVault.write.setBonez(["0x0000000000000000000000000000000000000000"]);
-      
+    it("Should revert when trying to set bonez to zero address", async function () {
+      const { arcadzVault } = await loadFixture(deployFixture);
+
       await expect(
-        arcadzVault.write.deposit([parseEther("100")], { account: user1.account })
-      ).to.be.rejectedWith("BonezContractNotSet");
+        arcadzVault.write.setBonez(["0x0000000000000000000000000000000000000000"])
+      ).to.be.rejectedWith("ZeroAddress");
     });
 
     it("Should revert when user has insufficient balance", async function () {
@@ -141,15 +145,16 @@ describe("ArcadzVault", function () {
     }
 
     it("Should allow users to withdraw tokens with valid signature", async function () {
-      const { arcadzVault, mockToken, signer, user1, publicClient } = await loadFixture(depositFixture);
-      
+      const { arcadzVault, mockToken, chainId, signer, user1, publicClient, deadline } = await loadFixture(depositFixture);
+
       const amount = parseEther("50");
       const nonce = 0n;
-      const signature = await createWithdrawSignature(signer, arcadzVault.address, amount, nonce, user1.account.address);
+      //const deadline = BigInt(Date.now()) + 60n * 1000n; // now + 1 minute
+      const signature = await createWithdrawSignature(signer, arcadzVault.address, amount, nonce, deadline, user1.account.address, chainId);
 
       const initialBalance = await mockToken.read.balanceOf([user1.account.address]);
 
-      const hash = await arcadzVault.write.withdraw([amount, nonce, signature], { account: user1.account });
+      const hash = await arcadzVault.write.withdraw([amount, nonce, deadline, signature], { account: user1.account });
       await publicClient.waitForTransactionReceipt({ hash });
 
       // Check event was emitted
@@ -173,83 +178,102 @@ describe("ArcadzVault", function () {
     });
 
     it("Should revert when withdraw amount is zero", async function () {
-      const { arcadzVault, signer, user1 } = await loadFixture(depositFixture);
-      
-      const signature = await createWithdrawSignature(signer, arcadzVault.address, 0n, 0n, user1.account.address);
-      
+      const { arcadzVault, chainId, signer, user1, deadline } = await loadFixture(depositFixture);
+
+      const amount = 0n;
+      const nonce = 0n;
+
+      const signature = await createWithdrawSignature(signer, arcadzVault.address, amount, nonce, deadline, user1.account.address, chainId);
+
       await expect(
-        arcadzVault.write.withdraw([0n, 0n, signature], { account: user1.account })
+        arcadzVault.write.withdraw([amount, nonce, deadline, signature], { account: user1.account })
       ).to.be.rejectedWith("ZeroAmount");
     });
 
     it("Should revert with invalid signature", async function () {
-      const { arcadzVault, user1, user2 } = await loadFixture(depositFixture);
-      
+      const { arcadzVault, chainId, user1, user2, deadline } = await loadFixture(depositFixture);
+
       const amount = parseEther("50");
       const nonce = 0n;
+      //const deadline = BigInt(Date.now()) + 60n * 1000n; // now + 1 minute
       // Create signature with wrong signer
-      const wrongSignature = await createWithdrawSignature(user2, arcadzVault.address, amount, nonce, user1.account.address);
+      const wrongSignature = await createWithdrawSignature(user2, arcadzVault.address, amount, nonce, deadline, user1.account.address, chainId);
 
       await expect(
-        arcadzVault.write.withdraw([amount, nonce, wrongSignature], { account: user1.account })
+        arcadzVault.write.withdraw([amount, nonce, deadline, wrongSignature], { account: user1.account })
       ).to.be.rejectedWith("InvalidSignature");
     });
 
     it("Should revert with invalid nonce", async function () {
-      const { arcadzVault, signer, user1 } = await loadFixture(depositFixture);
+      const { arcadzVault, chainId, signer, user1, deadline } = await loadFixture(depositFixture);
       
       const amount = parseEther("50");
       const wrongNonce = 5n; // User's current nonce is 0
-      const signature = await createWithdrawSignature(signer, arcadzVault.address, amount, wrongNonce, user1.account.address);
+
+      const signature = await createWithdrawSignature(signer, arcadzVault.address, amount, wrongNonce, deadline, user1.account.address, chainId);
 
       await expect(
-        arcadzVault.write.withdraw([amount, wrongNonce, signature], { account: user1.account })
+        arcadzVault.write.withdraw([amount, wrongNonce, deadline, signature], { account: user1.account })
       ).to.be.rejectedWith("InvalidNonce");
     });
 
+    it("Should revert with expired deadline", async function () {
+      const { arcadzVault, chainId, signer, user1 } = await loadFixture(depositFixture);
+
+      const amount = parseEther("50");
+      const nonce = 0n;
+      const pastDeadline = 0n
+
+      const signature = await createWithdrawSignature(signer, arcadzVault.address, amount, nonce, pastDeadline, user1.account.address, chainId);
+      
+      await expect(
+        arcadzVault.write.withdraw([amount, nonce, pastDeadline, signature], { account: user1.account })
+      ).to.be.rejectedWith("SignatureExpired");
+    });
+
     it("Should revert when trying to reuse nonce", async function () {
-      const { arcadzVault, signer, user1, publicClient } = await loadFixture(depositFixture);
+      const { arcadzVault, signer, user1, publicClient, chainId, deadline } = await loadFixture(depositFixture);
       
       const amount = parseEther("25");
       const nonce = 0n;
-      const signature = await createWithdrawSignature(signer, arcadzVault.address, amount, nonce, user1.account.address);
+      const signature = await createWithdrawSignature(signer, arcadzVault.address, amount, nonce, deadline, user1.account.address, chainId);
 
       // First withdrawal should succeed
-      const hash = await arcadzVault.write.withdraw([amount, nonce, signature], { account: user1.account });
+      const hash = await arcadzVault.write.withdraw([amount, nonce, deadline, signature], { account: user1.account });
       await publicClient.waitForTransactionReceipt({ hash });
 
       // Second withdrawal with same nonce should fail
       await expect(
-        arcadzVault.write.withdraw([amount, nonce, signature], { account: user1.account })
+        arcadzVault.write.withdraw([amount, nonce, deadline, signature], { account: user1.account })
       ).to.be.rejectedWith("InvalidNonce");
     });
 
     it("Should revert when contract has insufficient balance", async function () {
-      const { arcadzVault, signer, user1 } = await loadFixture(depositFixture);
-      
+      const { arcadzVault, signer, user1, deadline, chainId } = await loadFixture(depositFixture);
+
       const largeAmount = parseEther("200"); // More than deposited
       const nonce = 0n;
-      const signature = await createWithdrawSignature(signer, arcadzVault.address, largeAmount, nonce, user1.account.address);
+      const signature = await createWithdrawSignature(signer, arcadzVault.address, largeAmount, nonce, deadline, user1.account.address, chainId);
 
       await expect(
-        arcadzVault.write.withdraw([largeAmount, nonce, signature], { account: user1.account })
+        arcadzVault.write.withdraw([largeAmount, nonce, deadline, signature], { account: user1.account })
       ).to.be.rejectedWith("InsufficientContractBalance");
     });
 
     it("Should handle multiple sequential withdrawals", async function () {
-      const { arcadzVault, mockToken, signer, user1, publicClient } = await loadFixture(depositFixture);
-      
+      const { arcadzVault, mockToken, signer, user1, publicClient, chainId, deadline } = await loadFixture(depositFixture);
+
       const amount1 = parseEther("30");
       const amount2 = parseEther("20");
 
       // First withdrawal
-      const signature1 = await createWithdrawSignature(signer, arcadzVault.address, amount1, 0n, user1.account.address);
-      const hash1 = await arcadzVault.write.withdraw([amount1, 0n, signature1], { account: user1.account });
+      const signature1 = await createWithdrawSignature(signer, arcadzVault.address, amount1, 0n, deadline, user1.account.address, chainId);
+      const hash1 = await arcadzVault.write.withdraw([amount1, 0n, deadline, signature1], { account: user1.account });
       await publicClient.waitForTransactionReceipt({ hash: hash1 });
 
       // Second withdrawal with incremented nonce
-      const signature2 = await createWithdrawSignature(signer, arcadzVault.address, amount2, 1n, user1.account.address);
-      const hash2 = await arcadzVault.write.withdraw([amount2, 1n, signature2], { account: user1.account });
+      const signature2 = await createWithdrawSignature(signer, arcadzVault.address, amount2, 1n, deadline, user1.account.address, chainId);
+      const hash2 = await arcadzVault.write.withdraw([amount2, 1n, deadline, signature2], { account: user1.account });
       await publicClient.waitForTransactionReceipt({ hash: hash2 });
 
       const userNonce = await arcadzVault.read.nonceByAddress([user1.account.address]);
@@ -262,79 +286,90 @@ describe("ArcadzVault", function () {
 
   describe("Signature Verification", function () {
     it("Should verify valid signatures", async function () {
-      const { arcadzVault, signer, user1 } = await loadFixture(deployFixture);
+      const { arcadzVault, signer, user1, deadline, chainId } = await loadFixture(deployFixture);
       
       const amount = parseEther("50");
       const nonce = 0n;
-      const signature = await createWithdrawSignature(signer, arcadzVault.address, amount, nonce, user1.account.address);
+      const signature = await createWithdrawSignature(signer, arcadzVault.address, amount, nonce, deadline, user1.account.address, chainId);
 
-      const isValid = await arcadzVault.read.verify([amount, nonce, user1.account.address, signature]);
+      const isValid = await arcadzVault.read.verify([amount, nonce, deadline, user1.account.address, signature]);
       expect(isValid).to.be.true;
     });
 
     it("Should reject invalid signatures", async function () {
-      const { arcadzVault, user1, user2 } = await loadFixture(deployFixture);
+      const { arcadzVault, user1, user2, deadline, chainId } = await loadFixture(deployFixture);
       
       const amount = parseEther("50");
       const nonce = 0n;
-      const wrongSignature = await createWithdrawSignature(user2, arcadzVault.address, amount, nonce, user1.account.address);
+      const wrongSignature = await createWithdrawSignature(user2, arcadzVault.address, amount, nonce, deadline, user1.account.address, chainId);
 
-      const isValid = await arcadzVault.read.verify([amount, nonce, user1.account.address, wrongSignature]);
+      const isValid = await arcadzVault.read.verify([amount, nonce, deadline, user1.account.address, wrongSignature]);
+      expect(isValid).to.be.false;
+    });
+
+    it("Should reject expired signatures", async function () {
+      const { arcadzVault, signer, user1, chainId } = await loadFixture(deployFixture);
+
+      const amount = parseEther("50");
+      const nonce = 0n;
+      const pastDeadline = 0n; // Expired deadline
+
+      const signature = await createWithdrawSignature(signer, arcadzVault.address, amount, nonce, pastDeadline, user1.account.address, chainId);
+      const isValid = await arcadzVault.read.verify([amount, nonce, pastDeadline, user1.account.address, signature]);
       expect(isValid).to.be.false;
     });
 
     it("Should reject signatures with wrong parameters", async function () {
-      const { arcadzVault, signer, user1, user2 } = await loadFixture(deployFixture);
+      const { arcadzVault, signer, user1, user2, deadline, chainId } = await loadFixture(deployFixture);
       
       const amount = parseEther("50");
       const nonce = 0n;
-      const signature = await createWithdrawSignature(signer, arcadzVault.address, amount, nonce, user1.account.address);
+      const signature = await createWithdrawSignature(signer, arcadzVault.address, amount, nonce, deadline, user1.account.address, chainId);
 
       // Wrong amount
-      const wrongAmount = await arcadzVault.read.verify([amount + 1n, nonce, user1.account.address, signature]);
+      const wrongAmount = await arcadzVault.read.verify([amount + 1n, nonce, deadline, user1.account.address, signature]);
       expect(wrongAmount).to.be.false;
       
       // Wrong nonce
-      const wrongNonce = await arcadzVault.read.verify([amount, nonce + 1n, user1.account.address, signature]);
+      const wrongNonce = await arcadzVault.read.verify([amount, nonce + 1n, deadline, user1.account.address, signature]);
       expect(wrongNonce).to.be.false;
       
       // Wrong user
-      const wrongUser = await arcadzVault.read.verify([amount, nonce, user2.account.address, signature]);
+      const wrongUser = await arcadzVault.read.verify([amount, nonce, deadline, user2.account.address, signature]);
       expect(wrongUser).to.be.false;
     });
 
     it("Should revert with invalid signature length", async function () {
-      const { arcadzVault, user1 } = await loadFixture(deployFixture);
-      
+      const { arcadzVault, user1, deadline } = await loadFixture(deployFixture);
+
       const invalidSignature = "0x1234"; // Too short
       
       await expect(
-        arcadzVault.read.verify([parseEther("50"), 0n, user1.account.address, invalidSignature])
+        arcadzVault.read.verify([parseEther("50"), 0n, deadline, user1.account.address, invalidSignature])
       ).to.be.rejectedWith("InvalidSignatureLength");
     });
   });
 
   describe("Admin Functions", function () {
     it("Should allow owner to set bonez contract", async function () {
-      const { arcadzVault, user1 } = await loadFixture(deployFixture);
-      
-      const newTokenAddress = user1.account.address;
-      await arcadzVault.write.setBonez([newTokenAddress]);
+      const { arcadzVault, owner, mockToken } = await loadFixture(deployFixture);
+
+      await arcadzVault.write.setBonez([mockToken.address], { account: owner.account });
       
       const bonezContract = await arcadzVault.read.bonezContract();
-      expect(bonezContract).to.equal(getAddress(newTokenAddress));
+      expect(bonezContract).to.equal(getAddress(mockToken.address));
     });
 
     it("Should allow owner to set signer", async function () {
-      const { arcadzVault, user1, user2 } = await loadFixture(deployFixture);
+      const { arcadzVault, owner, user1, user2, deadline, chainId } = await loadFixture(deployFixture);
       
-      await arcadzVault.write.setSigner([user1.account.address]);
+      await arcadzVault.write.setSigner([user1.account.address], { account: owner.account });
       
       // Verify new signer works
       const amount = parseEther("50");
       const nonce = 0n;
-      const signature = await createWithdrawSignature(user1, arcadzVault.address, amount, nonce, user2.account.address);
-      const isValid = await arcadzVault.read.verify([amount, nonce, user2.account.address, signature]);
+      const signature = await createWithdrawSignature(user1, arcadzVault.address, amount, nonce, deadline, user2.account.address, chainId);
+      const isValid = await arcadzVault.read.verify([amount, nonce, deadline, user2.account.address, signature]);
       expect(isValid).to.be.true;
     });
 
@@ -347,8 +382,8 @@ describe("ArcadzVault", function () {
       await arcadzVault.write.deposit([depositAmount], { account: user1.account });
 
       const initialOwnerBalance = await mockToken.read.balanceOf([owner.account.address]);
-      
-      const hash = await arcadzVault.write.emergencyWithdraw();
+
+      const hash = await arcadzVault.write.emergencyWithdraw({ account: owner.account });
       await publicClient.waitForTransactionReceipt({ hash });
       
       const finalOwnerBalance = await mockToken.read.balanceOf([owner.account.address]);
@@ -369,8 +404,8 @@ describe("ArcadzVault", function () {
       });
 
       const initialBalance = await publicClient.getBalance({ address: owner.account.address });
-      
-      const hash = await arcadzVault.write.withdrawAvax();
+
+      const hash = await arcadzVault.write.withdrawAvax({ account: owner.account });
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
       
       const finalBalance = await publicClient.getBalance({ address: owner.account.address });
@@ -429,8 +464,8 @@ describe("ArcadzVault", function () {
     });
 
     it("Should prevent withdrawals when paused", async function () {
-      const { arcadzVault, mockToken, signer, user1, publicClient } = await loadFixture(deployFixture);
-      
+      const { arcadzVault, mockToken, signer, user1, deadline, chainId } = await loadFixture(deployFixture);
+
       // Setup deposit first
       const depositAmount = parseEther("100");
       await mockToken.write.approve([arcadzVault.address, depositAmount], { account: user1.account });
@@ -438,9 +473,9 @@ describe("ArcadzVault", function () {
 
       await arcadzVault.write.pause();
       
-      const signature = await createWithdrawSignature(signer, arcadzVault.address, parseEther("50"), 0n, user1.account.address);
+      const signature = await createWithdrawSignature(signer, arcadzVault.address, parseEther("50"), 0n, deadline, user1.account.address, chainId);
       await expect(
-        arcadzVault.write.withdraw([parseEther("50"), 0n, signature], { account: user1.account })
+        arcadzVault.write.withdraw([parseEther("50"), 0n, deadline, signature], { account: user1.account })
       ).to.be.rejected;
     });
 
@@ -459,8 +494,8 @@ describe("ArcadzVault", function () {
 
   describe("Edge Cases", function () {
     it("Should handle multiple users independently", async function () {
-      const { arcadzVault, mockToken, signer, user1, user2, publicClient } = await loadFixture(deployFixture);
-      
+      const { arcadzVault, mockToken, signer, user1, user2, publicClient, deadline, chainId } = await loadFixture(deployFixture);
+
       const depositAmount = parseEther("100");
       
       // Both users deposit
@@ -472,12 +507,12 @@ describe("ArcadzVault", function () {
 
       // Both users withdraw with their own nonces
       const withdrawAmount = parseEther("50");
-      const signature1 = await createWithdrawSignature(signer, arcadzVault.address, withdrawAmount, 0n, user1.account.address);
-      const signature2 = await createWithdrawSignature(signer, arcadzVault.address, withdrawAmount, 0n, user2.account.address);
+      const signature1 = await createWithdrawSignature(signer, arcadzVault.address, withdrawAmount, 0n, deadline, user1.account.address, chainId);
+      const signature2 = await createWithdrawSignature(signer, arcadzVault.address, withdrawAmount, 0n, deadline, user2.account.address, chainId);
 
-      const hash1 = await arcadzVault.write.withdraw([withdrawAmount, 0n, signature1], { account: user1.account });
-      const hash2 = await arcadzVault.write.withdraw([withdrawAmount, 0n, signature2], { account: user2.account });
-      
+      const hash1 = await arcadzVault.write.withdraw([withdrawAmount, 0n, deadline, signature1], { account: user1.account });
+      const hash2 = await arcadzVault.write.withdraw([withdrawAmount, 0n, deadline, signature2], { account: user2.account });
+
       await publicClient.waitForTransactionReceipt({ hash: hash1 });
       await publicClient.waitForTransactionReceipt({ hash: hash2 });
 
@@ -489,50 +524,74 @@ describe("ArcadzVault", function () {
     });
 
     it("Should handle very small amounts", async function () {
-      const { arcadzVault, mockToken, signer, user1, publicClient } = await loadFixture(deployFixture);
-      
+      const { arcadzVault, mockToken, signer, user1, publicClient, deadline, chainId } = await loadFixture(deployFixture);
+
       const smallAmount = 1n;
       await mockToken.write.approve([arcadzVault.address, smallAmount], { account: user1.account });
       await arcadzVault.write.deposit([smallAmount], { account: user1.account });
 
-      const signature = await createWithdrawSignature(signer, arcadzVault.address, smallAmount, 0n, user1.account.address);
-      const hash = await arcadzVault.write.withdraw([smallAmount, 0n, signature], { account: user1.account });
+      const signature = await createWithdrawSignature(signer, arcadzVault.address, smallAmount, 0n, deadline, user1.account.address, chainId);
+      const hash = await arcadzVault.write.withdraw([smallAmount, 0n, deadline, signature], { account: user1.account });
       await publicClient.waitForTransactionReceipt({ hash });
 
       const vaultBalance = await mockToken.read.balanceOf([arcadzVault.address]);
       expect(vaultBalance).to.equal(0n);
     });
+
+    it("Should return domain separator", async function () {
+      const { arcadzVault } = await loadFixture(deployFixture);
+      
+      const domainSeparator = await arcadzVault.read.getDomainSeparator();
+      expect(domainSeparator).to.be.a('string');
+      expect(domainSeparator).to.have.lengthOf(66); // 32 bytes in hex
+    });
   });
 
-  // Helper function to create withdrawal signatures
+  // Helper function to create withdrawal signatures using EIP-712
   async function createWithdrawSignature(
     signerWallet: WalletClient,
     vaultAddress: Address,
     amount: bigint,
     nonce: bigint,
-    userAddress: Address
+    deadline: bigint,
+    userAddress: Address,
+    chainId: number
   ): Promise<`0x${string}`> {
-    const messageHash = await getMessageHash(vaultAddress, amount, nonce, userAddress);
-    return signerWallet.signMessage({ account: signerWallet.account!, message: { raw: messageHash } });
-  }
+    // EIP-712 domain
+    const domain = {
+      name: 'ArcadzVault',
+      version: '1',
+      chainId: chainId,
+      verifyingContract: vaultAddress,
+    } as const;
 
-  // Helper function to get message hash
-  async function getMessageHash(
-    vaultAddress: Address,
-    amount: bigint,
-    nonce: bigint,
-    userAddress: Address
-  ): Promise<`0x${string}`> {
-    const encoded = encodeAbiParameters(
-      parseAbiParameters('address, uint256, uint256, address'),
-      [
-        getAddress(vaultAddress),
-        amount,
-        nonce,
-        getAddress(userAddress),
-      ]
-    );
+    // EIP-712 types
+    const types = {
+      Withdraw: [
+        { name: 'vault', type: 'address' },
+        { name: 'amount', type: 'uint256' },
+        { name: 'nonce', type: 'uint256' },
+        { name: 'userAddress', type: 'address' },
+        { name: 'deadline', type: 'uint256' },
+      ],
+    } as const;
 
-    return keccak256(encoded);
+    // Message to sign
+    const message = {
+      vault: vaultAddress,
+      amount: amount,
+      nonce: nonce,
+      userAddress: userAddress,
+      deadline: deadline,
+    } as const;
+
+    // Sign using EIP-712
+    return signerWallet.signTypedData({
+      account: signerWallet.account!,
+      domain,
+      types,
+      primaryType: 'Withdraw',
+      message,
+    });
   }
 });

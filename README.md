@@ -30,7 +30,26 @@ Deployment is managed via Hardhat Ignition:
 npm run deploy:localhost   # Deploy to local Hardhat node
 npm run deploy:testnet     # Deploy to Avalanche Fuji testnet
 npm run deploy:mainnet     # Deploy to Avalanche Mainnet
+
+npm run deploy:testnet -- --verify # Deploy to testnet with verification
+npm run deploy:mainnet -- --verify # Deploy to mainnet with verification
 ```
+
+## Verification post Deployment
+
+To verify the contract, ensure you have the `ETHERSCAN_API_KEY` set in your `.env` file. Then run:
+
+```sh
+npx hardhat verify --network <network> <contractAddress> "<bonezAddress>" "<signerAddress>"
+```
+
+Alternatively, you can verify an existing Hardhat Ignition deployment:
+
+```sh
+npx hardhat ignition verify chain-43113 # For Avalanche Fuji testnet
+npx hardhat ignition verify chain-43114 # For Avalanche Mainnet
+```
+
 
 ## Commands
 
@@ -53,7 +72,7 @@ All commands are run from the project root:
 To generate a withdraw signature (for testing or frontend usage):
 
 ```sh
-npx hardhat generate-signature --vault <vaultAddress> --amount <amount> --nonce <nonce> --user <userAddress>
+npx hardhat generate-signature --vault <vaultAddress> --amount <amount> --nonce <nonce> --user <userAddress> --deadline <deadline>
 ```
 
 Requires a `PRIVATE_KEY` and `SIGNER_ADDRESS` in `.env` file (used as the authorized signer).
